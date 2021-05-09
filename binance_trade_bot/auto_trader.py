@@ -33,7 +33,27 @@ class AutoTrader:
         ):
             can_sell = True
         else:
-            self.logger.info("Skipping sell")
+            # refresh balance
+            self.logger.debug(f"Cached balance resulted in an invalid opportunity, refreshing balance to confirm")
+            balance = self.manager.get_currency_balance(pair.from_coin.symbol, True)
+            if balance and balance * from_coin_price > self.manager.get_min_notional(
+                pair.from_coin.symbol, self.config.BRIDGE.symbol
+            ):
+                can_sell = True
+            else:
+                self.logger.info("Skipping sell, refreshing balances, maybe the order already went ahead?")
+                self.logger.debug(f"balance={balance}")
+                self.logger.debug(f"from_coin_price={from_coin_price}")
+                min_notional = self.manager.get_min_notional(pair.from_coin.symbol, self.config.BRIDGE.symbol)
+                self.logger.debug(f"from_symbol={pair.from_coin.symbol}")
+                self.logger.debug(f"min_notional={min_notional}")
+
+                # maybe we have a lot of usdt already?
+                bridgeBalance = self.manager.get_currency_balance(self.config.BRIDGE.symbol)
+                self.logger.debug(f"bridge {self.config.BRIDGE} balance {bridgeBalance}")
+                if bridgeBalance < 50:
+                    return None
+                self.logger.info(f"Looks like there is bridge currency, will continue with buy")
 
         if can_sell and self.manager.sell_alt(pair.from_coin, self.config.BRIDGE) is None:
             self.logger.info("Couldn't sell, going back to scouting mode...")
@@ -79,7 +99,7 @@ class AutoTrader:
             for pair in session.query(Pair).filter(Pair.ratio.is_(None)).all():
                 if not pair.from_coin.enabled or not pair.to_coin.enabled:
                     continue
-                self.logger.info(f"Initializing {pair.from_coin} vs {pair.to_coin}")
+                self.logger.debug(f"Initializing {pair.from_coin} vs {pair.to_coin}")
 
                 from_coin_price = self.manager.get_ticker_price(pair.from_coin + self.config.BRIDGE)
                 if from_coin_price is None:
@@ -144,7 +164,7 @@ class AutoTrader:
         # if we have any viable options, pick the one with the biggest ratio
         if ratio_dict:
             best_pair = max(ratio_dict, key=ratio_dict.get)
-            self.logger.info(f"Will be jumping from {coin} to {best_pair.to_coin_id}")
+            self.logger.info(f"Will be jumping from {coin} to <{best_pair.to_coin_id}>")
             self.transaction_through_bridge(best_pair)
 
     def bridge_scout(self):
