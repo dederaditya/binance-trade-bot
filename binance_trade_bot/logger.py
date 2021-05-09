@@ -1,7 +1,7 @@
 import logging.handlers
 
 from .notifications import NotificationHandler
-
+from .config import Config
 
 class Logger:
 
@@ -27,6 +27,8 @@ class Logger:
 
         # notification handler
         self.NotificationHandler = NotificationHandler(enable_notifications)
+        config = Config()
+        self.notificationName = config.NOTIFICATION_NAME
 
     def log(self, message, level="info", notification=True):
 
@@ -40,7 +42,7 @@ class Logger:
             self.Logger.debug(message)
 
         if notification and self.NotificationHandler.enabled:
-            self.NotificationHandler.send_notification(message)
+            self.NotificationHandler.send_notification(f"```\n<{self.notificationName}>: {message}\n```")
 
     def info(self, message, notification=True):
         self.log(message, "info", notification)
