@@ -74,7 +74,7 @@ class BinanceAPIManager:
             self.logger.debug(f"Fetched all ticker prices: {self.cache.ticker_values}")
             price = self.cache.ticker_values.get(ticker_symbol, None)
             if price is None:
-                self.logger.info(f"Ticker does not exist: {ticker_symbol} - will not be fetched from now on")
+                self.logger.debug(f"Ticker does not exist: {ticker_symbol} - will not be fetched from now on")
                 self.cache.non_existent_tickers.add(ticker_symbol)
 
         return price
@@ -128,21 +128,51 @@ class BinanceAPIManager:
     def get_min_notional(self, origin_symbol: str, target_symbol: str):
         return float(self.get_symbol_filter(origin_symbol, target_symbol, "MIN_NOTIONAL")["minNotional"])
 
+    def convert_legacy_order(self, legacyOrder):
+        self.logger.debug(f"Converting legacy order {legacyOrder}")
+        event = dict()
+        event["s"] = legacyOrder["symbol"]
+        event["S"] = legacyOrder["side"]
+        event["o"] = legacyOrder["type"]
+        event["i"] = legacyOrder["orderId"]
+        event["Z"] = legacyOrder["cummulativeQuoteQty"]
+        event["X"] = legacyOrder["status"]
+        event["p"] = legacyOrder["price"]
+        event["T"] = legacyOrder["time"]
+
+        return BinanceOrder(event)
+
     def wait_for_order(
         self, order_id, origin_symbol: str, target_symbol: str
     ) -> Optional[BinanceOrder]:  # pylint: disable=unsubscriptable-object
+        pollCounter = 0
         while True:
             order_status: BinanceOrder = self.cache.orders.get(order_id, None)
             if order_status is not None:
                 break
             self.logger.debug(f"Waiting for order {order_id} to be created")
+            pollCounter += 1
+            if pollCounter % 10 == 0:
+                self.logger.debug(f"Performing manual poll for {order_id} creation in case websockets broke")
+                try:
+                    order_status = self.convert_legacy_order(self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id))
+                    break
+                except BinanceAPIException as e:
+                    self.logger.debug(f"Order exception: {e}")
+                except Exception as e:  # pylint: disable=broad-except
+                    self.logger.info(f"Unexpected order creation error: {e}")
             time.sleep(1)
 
         self.logger.debug(f"Order created: {order_status}")
+        pollCounter = 0
 
         while order_status.status != "FILLED":
             try:
-                order_status = self.cache.orders.get(order_id, None)
+                order_status = self.cache.orders.get(order_id, order_status)
+                pollCounter += 1
+                if pollCounter % 60 == 0:
+                    self.logger.debug(f"Performing manual poll for {order_id} status in case websockets broke")
+                    order_status = self.convert_legacy_order(self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id))
 
                 self.logger.debug(f"Waiting for order {order_id} to be filled")
 
@@ -177,7 +207,7 @@ class BinanceAPIManager:
                 self.logger.info(e)
                 time.sleep(1)
             except Exception as e:  # pylint: disable=broad-except
-                self.logger.info(f"Unexpected Error: {e}")
+                self.logger.info(f"Unexpected order error: {e}")
                 time.sleep(1)
 
         self.logger.debug(f"Order filled: {order_status}")
@@ -233,7 +263,7 @@ class BinanceAPIManager:
         from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
 
         order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, from_coin_price)
-        self.logger.info(f"BUY QTY {order_quantity}")
+        self.logger.info(f"Buying roughly {order_quantity} {origin_symbol}")
 
         # Try to buy until successful
         order = None
@@ -244,7 +274,8 @@ class BinanceAPIManager:
                     quantity=order_quantity,
                     price=from_coin_price,
                 )
-                self.logger.info(order)
+                self.logger.info("Placed buy order, waiting for it to complete")
+                self.logger.debug(order)
             except BinanceAPIException as e:
                 self.logger.info(e)
                 time.sleep(1)
@@ -287,18 +318,20 @@ class BinanceAPIManager:
         from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
 
         order_quantity = self._sell_quantity(origin_symbol, target_symbol, origin_balance)
-        self.logger.info(f"Selling {order_quantity} of {origin_symbol}")
+        self.logger.info(f"Selling {order_quantity} {origin_symbol}")
 
-        self.logger.info(f"Balance is {origin_balance}")
+        self.logger.debug(f"Balance is {origin_balance}")
         order = None
         while order is None:
             # Should sell at calculated price to avoid lost coin
+            self.logger.debug("Attempting to place order")
             order = self.binance_client.order_limit_sell(
                 symbol=origin_symbol + target_symbol, quantity=order_quantity, price=from_coin_price
             )
+            self.logger.debug(f"order: {order}")
+        orderId = order["orderId"]
 
-        self.logger.info("order")
-        self.logger.info(order)
+        self.logger.info(f"Placed sell order {orderId}, waiting for it to complete")
 
         trade_log.set_ordered(origin_balance, target_balance, order_quantity)
 
@@ -311,7 +344,9 @@ class BinanceAPIManager:
         while new_balance >= origin_balance:
             new_balance = self.get_currency_balance(origin_symbol, True)
 
-        self.logger.info(f"Sold {origin_symbol}")
+        new_target_balance = self.get_currency_balance(target_symbol)
+
+        self.logger.info(f"Sold {origin_symbol} for {new_target_balance} {target_symbol}")
 
         trade_log.set_complete(order.cumulative_quote_qty)
 
