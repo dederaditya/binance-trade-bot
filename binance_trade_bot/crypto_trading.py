@@ -21,9 +21,9 @@ def main():
         logger.error("Invalid strategy name")
         return
     trader = strategy(manager, db, logger, config)
-    logger.info(f"Chosen strategy: {config.STRATEGY}")
+    logger.debug(f"Chosen strategy: {config.STRATEGY}")
 
-    logger.info("Creating database schema if it doesn't already exist")
+    logger.debug("Creating database schema if it doesn't already exist")
     db.create_database()
 
     db.set_coins(config.SUPPORTED_COIN_LIST)
