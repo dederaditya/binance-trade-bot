@@ -24,6 +24,8 @@ class Database:
         self.socketio_client = Client()
 
     def socketio_connect(self):
+        if not self.config.ENABLE_API:
+            return False
         if self.socketio_client.connected and self.socketio_client.namespaces:
             return True
         try:

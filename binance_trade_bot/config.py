@@ -21,7 +21,8 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "strategy": "default",
             "sell_timeout": "0",
             "buy_timeout": "0",
-            "notification_name": "trader"
+            "notification_name": "trader",
+            "enable_api": "False"
         }
 
         if not os.path.exists(CFG_FL_NAME):
@@ -72,3 +73,5 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
         self.SELL_TIMEOUT = os.environ.get("SELL_TIMEOUT") or config.get(USER_CFG_SECTION, "sell_timeout")
         self.BUY_TIMEOUT = os.environ.get("BUY_TIMEOUT") or config.get(USER_CFG_SECTION, "buy_timeout")
         self.NOTIFICATION_NAME = os.environ.get("NOTIFICATION_NAME") or config.get(USER_CFG_SECTION, "notification_name")
+        self.ENABLE_API = os.environ.get("ENABLE_API") or config.get(USER_CFG_SECTION, "enable_api")
+        self.ENABLE_API = self.ENABLE_API.lower() == "true"

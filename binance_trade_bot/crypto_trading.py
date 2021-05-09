@@ -22,6 +22,7 @@ def main():
         return
     trader = strategy(manager, db, logger, config)
     logger.debug(f"Chosen strategy: {config.STRATEGY}")
+    logger.debug(f"Enable API: {config.ENABLE_API}")
 
     logger.debug("Creating database schema if it doesn't already exist")
     db.create_database()
