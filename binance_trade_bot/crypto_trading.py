@@ -10,10 +10,12 @@ from .strategies import get_strategy
 
 
 def main():
-    logger = Logger()
+    config = Config()
+
+    logger = Logger(config)
     logger.info("Starting")
 
-    config = Config()
+
     db = Database(logger, config)
     manager = BinanceAPIManager(config, db, logger)
     strategy = get_strategy(config.STRATEGY)
