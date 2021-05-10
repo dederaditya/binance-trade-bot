@@ -8,7 +8,6 @@ services:
     volumes:
       - ./user.cfg:/app/user.cfg
       - ./data:/app/data
-      - ./logs:/app/logs
     command: python -m binance_trade_bot
     environment:
       - PYTHONUNBUFFERED=1
@@ -20,7 +19,6 @@ services:
     volumes:
       - ./user.cfg:/app/user.cfg
       - ./data:/app/data
-      - ./logs:/app/logs
     ports:
       - 5123:5123
     command: gunicorn binance_trade_bot.api_server:app -k eventlet -w 1 --threads 1 -b 0.0.0.0:5123
