@@ -1,5 +1,4 @@
 #!/bin/bash
-clear
 
 cmd1="sqlite3 data/crypto_trading.db"
 sql0=".mode column"
