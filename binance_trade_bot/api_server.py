@@ -20,8 +20,8 @@ cors = CORS(app, resources={r"/api/*": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 
-logger = Logger("api_server")
 config = Config()
+logger = Logger(config, "api_server")
 db = Database(logger, config)
 
 
