@@ -16,10 +16,10 @@ from .models import *  # pylint: disable=wildcard-import
 
 
 class Database:
-    def __init__(self, logger: Logger, config: Config, uri="sqlite:///data/crypto_trading.db"):
+    def __init__(self, logger: Logger, config: Config):
         self.logger = logger
         self.config = config
-        self.engine = create_engine(uri)
+        self.engine = create_engine(config.DB_URI)
         self.SessionMaker = sessionmaker(bind=self.engine)
         self.socketio_client = Client()
 

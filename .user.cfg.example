@@ -12,3 +12,4 @@ buy_timeout=0
 sell_timeout=0
 notification_name=trader
 enable_api=false
+db_uri=sqlite:///data/crypto_trading.db
