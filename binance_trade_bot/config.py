@@ -24,7 +24,7 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "notification_name": "trader",
             "enable_api": "False",
             "db_uri": "sqlite:///data/crypto_trading.db",
-            "loss_after_hours": "16",
+            "loss_after_hours": "0",
             "max_loss_percent": "15"
         }
 

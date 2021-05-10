@@ -167,7 +167,7 @@ class AutoTrader:
             self.logger.info(f"Will be jumping from {coin.symbol} to {best_pair.to_coin_id}")
             self.transaction_through_bridge(best_pair)
 
-        if self.db.get_current_coin_date() + timedelta(hours=self.config.LOSS_AFTER_HOURS) < datetime.now():
+        if self.config.LOSS_AFTER_HOURS > 0 and self.db.get_current_coin_date() + timedelta(hours=self.config.LOSS_AFTER_HOURS) < datetime.now():
             self.logger.debug("Have been stuck for more than a day, checking if we can settle for a loss")
             max_ratio_difference = (100 - self.config.MAX_LOSS_PERCENT) / 100
             fallback_pairs = {k: v for k, v in pair_ratios.items() if ((v + k.ratio) / k.ratio) > max_ratio_difference}
