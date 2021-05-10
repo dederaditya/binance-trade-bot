@@ -169,7 +169,7 @@ class AutoTrader:
 
         if self.db.get_current_coin_date() + timedelta(days=1) < datetime.now():
             self.logger.debug("Have been stuck for more than a day, checking if we can settle for a loss")
-            ratio_dict = { k : v for k, v in ratio_dict.items() if ((v + k.ratio) / k.ratio) > 0.85 }
+            ratio_dict = {k: v for k, v in ratio_dict.items() if ((v + k.ratio) / k.ratio) > 0.85}
             if ratio_dict:
                 best_pair = max(ratio_dict, key=ratio_dict.get)
                 loss_estimate = (1 - ((ratio_dict[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
