@@ -22,7 +22,8 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "sell_timeout": "0",
             "buy_timeout": "0",
             "notification_name": "trader",
-            "enable_api": "False"
+            "enable_api": "False",
+            "db_uri": "sqlite:///data/crypto_trading.db"
         }
 
         if not os.path.exists(CFG_FL_NAME):
@@ -75,3 +76,5 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
         self.NOTIFICATION_NAME = os.environ.get("NOTIFICATION_NAME") or config.get(USER_CFG_SECTION, "notification_name")
         self.ENABLE_API = os.environ.get("ENABLE_API") or config.get(USER_CFG_SECTION, "enable_api")
         self.ENABLE_API = self.ENABLE_API.lower() == "true"
+
+        self.DB_URI = os.environ.get("DB_URI") or config.get(USER_CFG_SECTION, "db_uri")
