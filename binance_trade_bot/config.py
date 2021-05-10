@@ -23,7 +23,9 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "buy_timeout": "0",
             "notification_name": "trader",
             "enable_api": "False",
-            "db_uri": "sqlite:///data/crypto_trading.db"
+            "db_uri": "sqlite:///data/crypto_trading.db",
+            "loss_after_hours": "16",
+            "max_loss_percent": "15"
         }
 
         if not os.path.exists(CFG_FL_NAME):
@@ -78,3 +80,11 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
         self.ENABLE_API = self.ENABLE_API.lower() == "true"
 
         self.DB_URI = os.environ.get("DB_URI") or config.get(USER_CFG_SECTION, "db_uri")
+
+        self.LOSS_AFTER_HOURS = int(
+            os.environ.get("LOSS_AFTER_HOURS") or config.get(USER_CFG_SECTION, "loss_after_hours")
+        )
+
+        self.MAX_LOSS_PERCENT = int(
+            os.environ.get("MAX_LOSS_PERCENT") or config.get(USER_CFG_SECTION, "max_loss_percent")
+        )

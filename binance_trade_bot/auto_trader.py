@@ -167,15 +167,15 @@ class AutoTrader:
             self.logger.info(f"Will be jumping from {coin.symbol} to {best_pair.to_coin_id}")
             self.transaction_through_bridge(best_pair)
 
-        if self.db.get_current_coin_date() + timedelta(days=1) < datetime.now():
+        if self.db.get_current_coin_date() + timedelta(hours=self.config.LOSS_AFTER_HOURS) < datetime.now():
             self.logger.debug("Have been stuck for more than a day, checking if we can settle for a loss")
-            fallback_pairs = {k: v for k, v in pair_ratios.items() if ((v + k.ratio) / k.ratio) > 0.85}
+            max_ratio_difference = (100 - self.config.MAX_LOSS_PERCENT) / 100
+            fallback_pairs = {k: v for k, v in pair_ratios.items() if ((v + k.ratio) / k.ratio) > max_ratio_difference}
             if ratio_dict:
                 best_pair = max(fallback_pairs, key=fallback_pairs.get)
                 loss_estimate = (1 - ((pair_ratios[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
                 self.logger.info(f"Will trade at a LOSS from {coin.symbol} to {best_pair.to_coin_id}, estimated loss {loss_estimate}%")
                 self.transaction_through_bridge(best_pair)
-
 
     def bridge_scout(self):
         """
