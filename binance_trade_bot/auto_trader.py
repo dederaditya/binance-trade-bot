@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 from sqlalchemy.orm import Session
@@ -156,16 +156,26 @@ class AutoTrader:
         """
         Given a coin, search for a coin to jump to
         """
-        ratio_dict = self._get_ratios(coin, coin_price)
+        pair_ratios = self._get_ratios(coin, coin_price)
 
         # keep only ratios bigger than zero
-        ratio_dict = {k: v for k, v in ratio_dict.items() if v > 0}
+        profitable_pairs = {k: v for k, v in pair_ratios.items() if v > 0}
 
         # if we have any viable options, pick the one with the biggest ratio
-        if ratio_dict:
-            best_pair = max(ratio_dict, key=ratio_dict.get)
-            self.logger.info(f"Will be jumping from {coin} to <{best_pair.to_coin_id}>")
+        if profitable_pairs:
+            best_pair = max(profitable_pairs, key=profitable_pairs.get)
+            self.logger.info(f"Will be jumping from {coin.symbol} to {best_pair.to_coin_id}")
             self.transaction_through_bridge(best_pair)
+
+        if self.config.LOSS_AFTER_HOURS > 0 and self.db.get_current_coin_date() + timedelta(hours=self.config.LOSS_AFTER_HOURS) < datetime.now():
+            self.logger.debug("Have been stuck for more than a day, checking if we can settle for a loss")
+            max_ratio_difference = (100 - self.config.MAX_LOSS_PERCENT) / 100
+            fallback_pairs = {k: v for k, v in pair_ratios.items() if ((v + k.ratio) / k.ratio) > max_ratio_difference}
+            if ratio_dict:
+                best_pair = max(fallback_pairs, key=fallback_pairs.get)
+                loss_estimate = (1 - ((pair_ratios[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
+                self.logger.info(f"Will trade at a LOSS from {coin.symbol} to {best_pair.to_coin_id}, estimated loss {loss_estimate}%")
+                self.transaction_through_bridge(best_pair)
 
     def bridge_scout(self):
         """

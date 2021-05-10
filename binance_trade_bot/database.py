@@ -117,6 +117,15 @@ class Database:
             session.expunge(coin)
             return coin
 
+    def get_current_coin_date(self) -> Optional[datetime]:
+        session: Session
+        with self.db_session() as session:
+            current_coin = session.query(CurrentCoin).order_by(CurrentCoin.datetime.desc()).first()
+            if current_coin is None:
+                return datetime.now()
+            coin_date = current_coin.datetime
+            return coin_date
+
     def get_pair(self, from_coin: Union[Coin, str], to_coin: Union[Coin, str]):
         from_coin = self.get_coin(from_coin)
         to_coin = self.get_coin(to_coin)
