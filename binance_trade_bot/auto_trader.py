@@ -156,24 +156,24 @@ class AutoTrader:
         """
         Given a coin, search for a coin to jump to
         """
-        ratio_dict = self._get_ratios(coin, coin_price)
+        pair_ratios = self._get_ratios(coin, coin_price)
 
         # keep only ratios bigger than zero
-        ratio_dict_reduced = {k: v for k, v in ratio_dict.items() if v > 0}
+        profitable_pairs = {k: v for k, v in pair_ratios.items() if v > 0}
 
         # if we have any viable options, pick the one with the biggest ratio
-        if ratio_dict_reduced:
-            best_pair = max(ratio_dict_reduced, key=ratio_dict_reduced.get)
-            self.logger.info(f"Will be jumping from {coin} to <{best_pair.to_coin_id}>")
+        if profitable_pairs:
+            best_pair = max(profitable_pairs, key=profitable_pairs.get)
+            self.logger.info(f"Will be jumping from {coin.symbol} to {best_pair.to_coin_id}")
             self.transaction_through_bridge(best_pair)
 
         if self.db.get_current_coin_date() + timedelta(days=1) < datetime.now():
             self.logger.debug("Have been stuck for more than a day, checking if we can settle for a loss")
-            ratio_dict = {k: v for k, v in ratio_dict.items() if ((v + k.ratio) / k.ratio) > 0.85}
+            fallback_pairs = {k: v for k, v in pair_ratios.items() if ((v + k.ratio) / k.ratio) > 0.85}
             if ratio_dict:
-                best_pair = max(ratio_dict, key=ratio_dict.get)
-                loss_estimate = (1 - ((ratio_dict[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
-                self.logger.info(f"Will trade at a LOSS from {coin} to <{best_pair.to_coin_id}>, estimated loss {loss_estimate}%")
+                best_pair = max(fallback_pairs, key=fallback_pairs.get)
+                loss_estimate = (1 - ((pair_ratios[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
+                self.logger.info(f"Will trade at a LOSS from {coin.symbol} to {best_pair.to_coin_id}, estimated loss {loss_estimate}%")
                 self.transaction_through_bridge(best_pair)
 
 
