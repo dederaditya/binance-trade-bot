@@ -25,6 +25,8 @@ def main():
     trader = strategy(manager, db, logger, config)
     logger.debug(f"Chosen strategy: {config.STRATEGY}")
     logger.debug(f"Enable API: {config.ENABLE_API}")
+    logger.debug(f"Will allow losses after not trading for {config.LOSS_AFTER_HOURS} hours")
+    logger.debug(f"Max allowed loss: {config.MAX_LOSS_PERCENT}%")
 
     logger.debug("Creating database schema if it doesn't already exist")
     db.create_database()
