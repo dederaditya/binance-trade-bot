@@ -98,7 +98,8 @@ class BinanceStreamManager:
                 "order_price": float(order["price"]),
                 "transaction_time": order["time"],
             }
-            self.logger.info(f"Pending order {order_id} for symbol {symbol} fetched:\n{fake_report}", False)
+            self.logger.info(f"Pending order {order_id} for symbol {symbol} fetched", False)
+            self.logger.debug(f"order={fake_report}")
             self.cache.orders[fake_report["order_id"]] = BinanceOrder(fake_report)
 
     def _invalidate_balances(self):
