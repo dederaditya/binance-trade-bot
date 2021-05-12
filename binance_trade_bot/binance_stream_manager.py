@@ -120,7 +120,7 @@ class BinanceStreamManager:
                 if signal_type == "CONNECT":
                     stream_info = self.bw_api_manager.get_stream_info(stream_id)
                     if "!userData" in stream_info["markets"]:
-                        self.logger.debug("Connect for userdata arrived", False)
+                        self.logger.debug("Connect for userdata arrived")
                         self._fetch_pending_orders()
                         self._invalidate_balances()
             if stream_data is not False:
