@@ -66,11 +66,13 @@ class OrderGuard:
 
 class BinanceStreamManager:
     def __init__(
-        self, cache: BinanceCache, api_key: str, api_secret: str, binance_client: binance.client.Client, logger: Logger
+        self, cache: BinanceCache, api_tld: str, api_key: str, api_secret: str, binance_client: binance.client.Client, logger: Logger
     ):
         self.cache = cache
         self.logger = logger
-        self.bw_api_manager = BinanceWebSocketApiManager(output_default="UnicornFy", enable_stream_signal_buffer=True)
+        exchange_domain = "binance." + api_tld
+        self.logger.debug(f"Connecting to exchage {exchange_domain}")
+        self.bw_api_manager = BinanceWebSocketApiManager(exchange=exchange_domain, output_default="UnicornFy", enable_stream_signal_buffer=True)
         self.bw_api_manager.create_stream(["arr"], ["!miniTicker"], api_key=api_key, api_secret=api_secret)
         self.bw_api_manager.create_stream(["arr"], ["!userData"], api_key=api_key, api_secret=api_secret)
         self.binance_client = binance_client
