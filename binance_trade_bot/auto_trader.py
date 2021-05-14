@@ -176,6 +176,10 @@ class AutoTrader:
                 loss_estimate = (1 - ((pair_ratios[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
                 self.logger.info(f"Will trade at a LOSS from {coin.symbol} to {best_pair.to_coin_id}, estimated loss {loss_estimate}%")
                 self.transaction_through_bridge(best_pair)
+            else:
+                best_pair = max(pair_ratios, key=pair_ratios.get)
+                loss_estimate = (1 - ((pair_ratios[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
+                self.logger.debug(f"Loss is currently too great with pair {best_pair.to_coin_id} at {loss_estimate}%")
 
     def bridge_scout(self):
         """
