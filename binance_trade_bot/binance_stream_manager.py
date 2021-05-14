@@ -8,6 +8,7 @@ import binance.client
 from binance.exceptions import BinanceAPIException, BinanceRequestException
 from unicorn_binance_websocket_api import BinanceWebSocketApiManager
 
+from .config import Config
 from .logger import Logger
 
 
@@ -65,16 +66,18 @@ class OrderGuard:
 
 
 class BinanceStreamManager:
-    def __init__(
-        self, cache: BinanceCache, api_tld: str, api_key: str, api_secret: str, binance_client: binance.client.Client, logger: Logger
-    ):
+    def __init__(self, cache: BinanceCache, config: Config, binance_client: binance.client.Client, logger: Logger):
         self.cache = cache
         self.logger = logger
-        exchange_domain = "binance." + api_tld
-        self.logger.debug(f"Connecting to exchage {exchange_domain}")
-        self.bw_api_manager = BinanceWebSocketApiManager(exchange=exchange_domain, output_default="UnicornFy", enable_stream_signal_buffer=True)
-        self.bw_api_manager.create_stream(["arr"], ["!miniTicker"], api_key=api_key, api_secret=api_secret)
-        self.bw_api_manager.create_stream(["arr"], ["!userData"], api_key=api_key, api_secret=api_secret)
+        self.bw_api_manager = BinanceWebSocketApiManager(
+            output_default="UnicornFy", enable_stream_signal_buffer=True, exchange=f"binance.{config.BINANCE_TLD}"
+        )
+        self.bw_api_manager.create_stream(
+            ["arr"], ["!miniTicker"], api_key=config.BINANCE_API_KEY, api_secret=config.BINANCE_API_SECRET_KEY
+        )
+        self.bw_api_manager.create_stream(
+            ["arr"], ["!userData"], api_key=config.BINANCE_API_KEY, api_secret=config.BINANCE_API_SECRET_KEY
+        )
         self.binance_client = binance_client
         self.pending_orders: Set[Tuple[str, int]] = set()
         self.pending_orders_mutex: threading.Lock = threading.Lock()
@@ -147,8 +150,8 @@ class BinanceStreamManager:
             self.logger.debug(f"Balance update: {stream_data}")
             with self.cache.open_balances() as balances:
                 del balances[stream_data["asset"]]
-        elif event_type == "outboundAccountPosition":  # !userData
-            self.logger.debug(f"outboundAccountPosition: {stream_data}")
+        elif event_type in ("outboundAccountPosition", "outboundAccountInfo"):  # !userData
+            self.logger.debug(f"{event_type}: {stream_data}")
             with self.cache.open_balances() as balances:
                 for bal in stream_data["balances"]:
                     balances[bal["asset"]] = float(bal["free"])
