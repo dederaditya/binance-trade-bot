@@ -1,4 +1,5 @@
 import logging.handlers
+import subprocess
 
 from .notifications import NotificationHandler
 from .config import Config
@@ -42,3 +43,9 @@ class Logger:
 
     def debug(self, message):
         self.log(message, logging.DEBUG)
+
+    def log_progress(self):
+        with subprocess.Popen(["./scripts/checkProgress.sh", "LIMIT 10"], stdout=subprocess.PIPE) as session:
+            progress = session.stdout.read().decode("UTF-8")
+            message = f"Progress report for up to the last 10 trades:\n{progress}"
+            self.info(message)
