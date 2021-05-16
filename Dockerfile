@@ -7,7 +7,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY . .
+
+COPY ./requirements.txt .
 RUN pip install -r ./requirements.txt
+
+COPY . .
 
 CMD ["python", "-m", "binance_trade_bot"]
