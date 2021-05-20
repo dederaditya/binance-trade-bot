@@ -27,7 +27,7 @@ class Logger:
                 notification_handler.setFormatter(notification_formatter)
                 self.logger.addHandler(notification_handler)
             except Exception as e:
-                self.warning(f"Couldn't enable notifications: {e}", e)
+                self.warning(f"Couldn't enable notifications: {e}")
 
     def log(self, message, level):
         self.logger.log(level, message)
