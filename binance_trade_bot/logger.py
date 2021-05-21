@@ -1,55 +1,51 @@
 import logging.handlers
+import subprocess
 
 from .notifications import NotificationHandler
-
+from .config import Config
 
 class Logger:
+    logger = None
 
-    Logger = None
-    NotificationHandler = None
+    def __init__(self, config, logging_service="crypto_trading", enable_notifications=True):
+        self.logger = logging.getLogger(f"{logging_service}_logger")
+        self.logger.setLevel(logging.DEBUG)
 
-    def __init__(self, logging_service="crypto_trading", enable_notifications=True):
-        # Logger setup
-        self.Logger = logging.getLogger(f"{logging_service}_logger")
-        self.Logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        # default is "logs/crypto_trading.log"
-        fh = logging.FileHandler(f"logs/{logging_service}.log")
-        fh.setLevel(logging.DEBUG)
-        fh.setFormatter(formatter)
-        self.Logger.addHandler(fh)
+        stdout_formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        stdout_handler = logging.StreamHandler()
+        stdout_handler.setLevel(logging.DEBUG)
+        stdout_handler.setFormatter(stdout_formatter)
+        self.logger.addHandler(stdout_handler)
 
-        # logging to console
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        ch.setFormatter(formatter)
-        self.Logger.addHandler(ch)
+        if enable_notifications:
+            try:
+                notification_formatter = logging.Formatter(
+                    f"```\n<{config.NOTIFICATION_NAME}>: %(name)s - %(levelname)s - %(message)s\n```")
+                notification_handler = NotificationHandler()
+                notification_handler.setLevel(logging.INFO)
+                notification_handler.setFormatter(notification_formatter)
+                self.logger.addHandler(notification_handler)
+            except Exception as e:
+                self.warning(f"Couldn't enable notifications: {e}")
 
-        # notification handler
-        self.NotificationHandler = NotificationHandler(enable_notifications)
+    def log(self, message, level):
+        self.logger.log(level, message)
 
-    def log(self, message, level="info", notification=True):
+    def info(self, message):
+        self.log(message, logging.INFO)
 
-        if level == "info":
-            self.Logger.info(message)
-        elif level == "warning":
-            self.Logger.warning(message)
-        elif level == "error":
-            self.Logger.error(message)
-        elif level == "debug":
-            self.Logger.debug(message)
+    def warning(self, message):
+        self.log(message, logging.WARNING)
 
-        if notification and self.NotificationHandler.enabled:
-            self.NotificationHandler.send_notification(message)
+    def error(self, message):
+        self.log(message, logging.ERROR)
 
-    def info(self, message, notification=True):
-        self.log(message, "info", notification)
+    def debug(self, message):
+        self.log(message, logging.DEBUG)
 
-    def warning(self, message, notification=True):
-        self.log(message, "warning", notification)
-
-    def error(self, message, notification=True):
-        self.log(message, "error", notification)
-
-    def debug(self, message, notification=False):
-        self.log(message, "debug", notification)
+    def log_progress(self):
+        with subprocess.Popen(["./scripts/checkProgress.sh", "LIMIT 10"], stdout=subprocess.PIPE) as session:
+            progress = session.stdout.read().decode("UTF-8")
+            message = f"Progress report for up to the last 10 trades:\n{progress}"
+            self.info(message)

@@ -10,10 +10,12 @@ from .strategies import get_strategy
 
 
 def main():
-    logger = Logger()
+    config = Config()
+
+    logger = Logger(config)
     logger.info("Starting")
 
-    config = Config()
+
     db = Database(logger, config)
     manager = BinanceAPIManager(config, db, logger)
     # check if we can access API feature that require valid config
@@ -28,9 +30,16 @@ def main():
         logger.error("Invalid strategy name")
         return
     trader = strategy(manager, db, logger, config)
-    logger.info(f"Chosen strategy: {config.STRATEGY}")
+    logger.debug(f"Chosen strategy: {config.STRATEGY}")
+    logger.debug(f"Enable API: {config.ENABLE_API}")
 
-    logger.info("Creating database schema if it doesn't already exist")
+    if config.LOSS_AFTER_HOURS > 0:
+        logger.debug(f"Will allow losses after not trading for {config.LOSS_AFTER_HOURS} hours")
+        logger.debug(f"Max allowed loss: {config.MAX_LOSS_PERCENT}%")
+    else:
+        logger.debug("Will not allow losses")
+
+    logger.debug("Creating database schema if it doesn't already exist")
     db.create_database()
 
     db.set_coins(config.SUPPORTED_COIN_LIST)
@@ -43,6 +52,7 @@ def main():
     schedule.every(1).minutes.do(trader.update_values).tag("updating value history")
     schedule.every(1).minutes.do(db.prune_scout_history).tag("pruning scout history")
     schedule.every(1).hours.do(db.prune_value_history).tag("pruning value history")
+    schedule.every(12).hours.do(logger.log_progress).tag("logging progress")
     try:
         while True:
             schedule.run_pending()

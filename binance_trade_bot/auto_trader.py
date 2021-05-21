@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 from sqlalchemy.orm import Session
@@ -33,7 +33,27 @@ class AutoTrader:
         ):
             can_sell = True
         else:
-            self.logger.info("Skipping sell")
+            # refresh balance
+            self.logger.debug(f"Cached balance resulted in an invalid opportunity, refreshing balance to confirm")
+            balance = self.manager.get_currency_balance(pair.from_coin.symbol, True)
+            if balance and balance * from_coin_price > self.manager.get_min_notional(
+                pair.from_coin.symbol, self.config.BRIDGE.symbol
+            ):
+                can_sell = True
+            else:
+                self.logger.info("Skipping sell, refreshing balances, maybe the order already went ahead?")
+                self.logger.debug(f"balance={balance}")
+                self.logger.debug(f"from_coin_price={from_coin_price}")
+                min_notional = self.manager.get_min_notional(pair.from_coin.symbol, self.config.BRIDGE.symbol)
+                self.logger.debug(f"from_symbol={pair.from_coin.symbol}")
+                self.logger.debug(f"min_notional={min_notional}")
+
+                # maybe we have a lot of usdt already?
+                bridgeBalance = self.manager.get_currency_balance(self.config.BRIDGE.symbol)
+                self.logger.debug(f"bridge {self.config.BRIDGE} balance {bridgeBalance}")
+                if bridgeBalance < 50:
+                    return None
+                self.logger.info(f"Looks like there is bridge currency, will continue with buy")
 
         if can_sell and self.manager.sell_alt(pair.from_coin, self.config.BRIDGE) is None:
             self.logger.info("Couldn't sell, going back to scouting mode...")
@@ -79,7 +99,7 @@ class AutoTrader:
             for pair in session.query(Pair).filter(Pair.ratio.is_(None)).all():
                 if not pair.from_coin.enabled or not pair.to_coin.enabled:
                     continue
-                self.logger.info(f"Initializing {pair.from_coin} vs {pair.to_coin}")
+                self.logger.debug(f"Initializing {pair.from_coin} vs {pair.to_coin}")
 
                 from_coin_price = self.manager.get_ticker_price(pair.from_coin + self.config.BRIDGE)
                 if from_coin_price is None:
@@ -136,16 +156,30 @@ class AutoTrader:
         """
         Given a coin, search for a coin to jump to
         """
-        ratio_dict = self._get_ratios(coin, coin_price)
+        pair_ratios = self._get_ratios(coin, coin_price)
 
         # keep only ratios bigger than zero
-        ratio_dict = {k: v for k, v in ratio_dict.items() if v > 0}
+        profitable_pairs = {k: v for k, v in pair_ratios.items() if v > 0}
 
         # if we have any viable options, pick the one with the biggest ratio
-        if ratio_dict:
-            best_pair = max(ratio_dict, key=ratio_dict.get)
-            self.logger.info(f"Will be jumping from {coin} to {best_pair.to_coin_id}")
+        if profitable_pairs:
+            best_pair = max(profitable_pairs, key=profitable_pairs.get)
+            self.logger.info(f"Will be jumping from {coin.symbol} to {best_pair.to_coin_id}")
             self.transaction_through_bridge(best_pair)
+
+        if self.config.LOSS_AFTER_HOURS > 0 and self.db.get_current_coin_date() + timedelta(hours=self.config.LOSS_AFTER_HOURS) < datetime.now():
+            self.logger.debug("Have been stuck for more than a day, checking if we can settle for a loss")
+            max_ratio_difference = (100 - self.config.MAX_LOSS_PERCENT) / 100
+            fallback_pairs = {k: v for k, v in pair_ratios.items() if ((v + k.ratio) / k.ratio) > max_ratio_difference}
+            if fallback_pairs:
+                best_pair = max(fallback_pairs, key=fallback_pairs.get)
+                loss_estimate = (1 - ((pair_ratios[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
+                self.logger.info(f"Will trade at a LOSS from {coin.symbol} to {best_pair.to_coin_id}, estimated loss {loss_estimate}%")
+                self.transaction_through_bridge(best_pair)
+            else:
+                best_pair = max(pair_ratios, key=pair_ratios.get)
+                loss_estimate = (1 - ((pair_ratios[best_pair] + best_pair.ratio) / best_pair.ratio)) * 100
+                self.logger.debug(f"Loss is currently too great with pair {best_pair.to_coin_id} at {loss_estimate}%")
 
     def bridge_scout(self):
         """

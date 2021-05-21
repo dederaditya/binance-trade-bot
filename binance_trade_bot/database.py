@@ -16,14 +16,16 @@ from .models import *  # pylint: disable=wildcard-import
 
 
 class Database:
-    def __init__(self, logger: Logger, config: Config, uri="sqlite:///data/crypto_trading.db"):
+    def __init__(self, logger: Logger, config: Config):
         self.logger = logger
         self.config = config
-        self.engine = create_engine(uri)
+        self.engine = create_engine(config.DB_URI)
         self.SessionMaker = sessionmaker(bind=self.engine)
         self.socketio_client = Client()
 
     def socketio_connect(self):
+        if not self.config.ENABLE_API:
+            return False
         if self.socketio_client.connected and self.socketio_client.namespaces:
             return True
         try:
@@ -114,6 +116,15 @@ class Database:
             coin = current_coin.coin
             session.expunge(coin)
             return coin
+
+    def get_current_coin_date(self) -> Optional[datetime]:
+        session: Session
+        with self.db_session() as session:
+            current_coin = session.query(CurrentCoin).order_by(CurrentCoin.datetime.desc()).first()
+            if current_coin is None:
+                return datetime.now()
+            coin_date = current_coin.datetime
+            return coin_date
 
     def get_pair(self, from_coin: Union[Coin, str], to_coin: Union[Coin, str]):
         from_coin = self.get_coin(from_coin)
