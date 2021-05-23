@@ -19,7 +19,7 @@ class Database:
     def __init__(self, logger: Logger, config: Config):
         self.logger = logger
         self.config = config
-        self.engine = create_engine(config.DB_URI)
+        self.engine = create_engine(config.DB_URI, pool_size=10, max_overflow=20)
         self.SessionMaker = sessionmaker(bind=self.engine)
         self.socketio_client = Client()
 
