@@ -19,9 +19,18 @@ class Database:
     def __init__(self, logger: Logger, config: Config):
         self.logger = logger
         self.config = config
-        self.engine = create_engine(config.DB_URI, pool_size=10, max_overflow=20)
-        self.SessionMaker = sessionmaker(bind=self.engine)
         self.socketio_client = Client()
+
+        engine_args = {}
+        if not config.DB_URI.startswith("sqlite"):
+            engine_args = {
+                "pool_size": 10,
+                "max_overflow": 20
+            }
+
+        self.engine = create_engine(config.DB_URI, **engine_args)
+        self.SessionMaker = sessionmaker(bind=self.engine)
+
 
     def socketio_connect(self):
         if not self.config.ENABLE_API:
