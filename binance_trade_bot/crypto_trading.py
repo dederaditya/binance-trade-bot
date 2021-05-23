@@ -52,7 +52,10 @@ def main():
     schedule.every(1).minutes.do(trader.update_values).tag("updating value history")
     schedule.every(1).minutes.do(db.prune_scout_history).tag("pruning scout history")
     schedule.every(1).hours.do(db.prune_value_history).tag("pruning value history")
-    schedule.every(12).hours.do(logger.log_progress).tag("logging progress")
+
+    # TODO: Implement scripts in SQLAlchemy.
+    # schedule.every(12).hours.do(logger.log_progress).tag("logging progress")
+
     try:
         while True:
             schedule.run_pending()
