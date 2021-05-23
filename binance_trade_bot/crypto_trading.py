@@ -7,7 +7,7 @@ from .database import Database
 from .logger import Logger
 from .scheduler import SafeScheduler
 from .strategies import get_strategy
-
+from .stats import log_progress
 
 def main():
     config = Config()
@@ -52,7 +52,10 @@ def main():
     schedule.every(1).minutes.do(trader.update_values).tag("updating value history")
     schedule.every(1).minutes.do(db.prune_scout_history).tag("pruning scout history")
     schedule.every(1).hours.do(db.prune_value_history).tag("pruning value history")
-    schedule.every(12).hours.do(logger.log_progress).tag("logging progress")
+    schedule.every(12).hours.do(log_progress, db=db, logger=logger).tag(
+        "logging progress"
+    )
+
     try:
         while True:
             schedule.run_pending()

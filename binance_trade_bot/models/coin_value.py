@@ -28,7 +28,9 @@ class CoinValue(Base):
     usd_price = Column(Float)
     btc_price = Column(Float)
 
-    interval = Column(Enum(Interval))
+    # Enum named "coin_interval" to stop clash with existing PostgreSQL
+    # interval type.
+    interval = Column(Enum(Interval, name="coin_interval"))
 
     datetime = Column(DateTime)
 
