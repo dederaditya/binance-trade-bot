@@ -308,7 +308,6 @@ class BinanceAPIManager:
                     quantity=order_quantity,
                     price=from_coin_price,
                 )
-                self.logger.info("Placed buy order, waiting for it to complete")
                 self.logger.debug(order)
             except BinanceAPIException as e:
                 self.logger.info(e)
@@ -316,10 +315,12 @@ class BinanceAPIManager:
             except Exception as e:  # pylint: disable=broad-except
                 self.logger.warning(f"Unexpected Error: {e}")
 
+        orderId = order["orderId"]
+        self.logger.info(f"Placed buy order {orderId}, waiting for it to complete")
         trade_log.set_ordered(origin_balance, target_balance, order_quantity)
 
-        order_guard.set_order(origin_symbol, target_symbol, int(order["orderId"]))
-        order = self.wait_for_order(order["orderId"], origin_symbol, target_symbol, order_guard)
+        order_guard.set_order(origin_symbol, target_symbol, int(orderId))
+        order = self.wait_for_order(orderId, origin_symbol, target_symbol, order_guard)
 
         if order is None:
             return None
