@@ -15,3 +15,4 @@ enable_api=false
 db_uri=sqlite:///data/crypto_trading.db
 loss_after_hours=0
 max_loss_percent=15
+log_progress_after_hours=12

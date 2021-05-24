@@ -59,6 +59,7 @@ Create a .cfg file named `user.cfg` based off `.user.cfg.example`, then add your
 -   **strategy** - The trading strategy to use. See [`binance_trade_bot/strategies`](binance_trade_bot/strategies/README.md) for more information
 -   **buy_timeout/sell_timeout** - Controls how many minutes to wait before cancelling a limit order (buy/sell) and returning to "scout" mode. 0 means that the order will never be cancelled prematurely.
 -   **scout_sleep_time** - Controls how many seconds bot should wait between analysis of current prices. Since the bot now operates on websockets this value should be set to something low (like 1), the reasons to set it above 1 are when you observe high CPU usage by bot or you got api errors about requests weight limit.
+-   **log_progress_after_hours** - Controls how many hours should pass before logging the coin progress, if you have notifications enabled this will be sent through the notifications as well. Set to 0 to disable.
 
 #### Environment Variables
 
@@ -76,6 +77,7 @@ TLD: com
 STRATEGY: default
 BUY_TIMEOUT: 0
 SELL_TIMEOUT: 0
+LOG_PROGRESS_AFTER_HOURS: 12
 ```
 
 ### Paying Fees with BNB
