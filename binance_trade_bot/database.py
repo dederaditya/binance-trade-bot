@@ -29,8 +29,7 @@ class Database:
             }
 
         self.engine = create_engine(config.DB_URI, **engine_args)
-        self.SessionMaker = sessionmaker(bind=self.engine)
-
+        self.session_factory = sessionmaker(bind=self.engine)
 
     def socketio_connect(self):
         if not self.config.ENABLE_API:
@@ -51,10 +50,10 @@ class Database:
         """
         Creates a context with an open SQLAlchemy session.
         """
-        session: Session = scoped_session(self.SessionMaker)
+        session: Session = scoped_session(self.session_factory)
         yield session
         session.commit()
-        session.close()
+        session.remove()
 
     def set_coins(self, symbols: List[str]):
         session: Session
