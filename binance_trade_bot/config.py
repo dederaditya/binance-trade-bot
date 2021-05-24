@@ -25,7 +25,8 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "enable_api": "False",
             "db_uri": "sqlite:///data/crypto_trading.db",
             "loss_after_hours": "0",
-            "max_loss_percent": "15"
+            "max_loss_percent": "15",
+            "log_progress_after_hours": "12"
         }
 
         if not os.path.exists(CFG_FL_NAME):
@@ -87,4 +88,8 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
 
         self.MAX_LOSS_PERCENT = int(
             os.environ.get("MAX_LOSS_PERCENT") or config.get(USER_CFG_SECTION, "max_loss_percent")
+        )
+
+        self.LOG_PROGRESS_AFTER_HOURS = int(
+            os.environ.get("LOG_PROGRESS_AFTER_HOURS") or config.get(USER_CFG_SECTION, "log_progress_after_hours")
         )
