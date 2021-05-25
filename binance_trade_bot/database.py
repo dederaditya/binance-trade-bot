@@ -7,12 +7,32 @@ from typing import List, Optional, Union
 
 from socketio import Client
 from socketio.exceptions import ConnectionError as SocketIOConnectionError
-from sqlalchemy import create_engine, func
+
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
+from sqlalchemy.sql.expression import ColumnClause
 
 from .config import Config
 from .logger import Logger
 from .models import *  # pylint: disable=wildcard-import
+
+
+class IfDialect(ColumnClause):
+    def __init__(self, default, **dialect_elements):
+        self.default_element = default
+        self.dialect_elements = dialect_elements
+
+
+@compiles(IfDialect)
+def _compile_IfDialect(element, compiler, **kwargs):
+    return compiler.process(
+        element.dialect_elements.get(compiler.dialect.name, element.default_element),
+        **kwargs
+    )
+
+
+if_dialect = IfDialect
 
 
 class Database:
@@ -186,27 +206,35 @@ class Database:
             session.query(ScoutHistory).filter(ScoutHistory.datetime < time_diff).delete()
 
     def prune_value_history(self):
+        def _datetime_query(default, sqlite):
+            dt_column = if_dialect(
+                default=func.to_char(CoinValue.datetime, default),
+                sqlite=func.strftime(sqlite, CoinValue.datetime),
+            )
+
+            return select(CoinValue, func.min(CoinValue.datetime), dt_column).group_by(
+                CoinValue.coin_id, CoinValue, dt_column
+            )
+
+        hourly_query = _datetime_query(default="HH24", sqlite="%H")
+        weekly_query = _datetime_query(default="WW", sqlite="%W")
+        daily_query = _datetime_query(default="DDD", sqlite="%j")
+
         session: Session
         with self.db_session() as session:
             # Sets the first entry for each coin for each hour as 'hourly'
-            hourly_entries: List[CoinValue] = (
-                session.query(CoinValue).group_by(CoinValue.coin_id, func.strftime("%H", CoinValue.datetime)).all()
-            )
+            hourly_entries: List[CoinValue] = session.execute(hourly_query).scalars()
             for entry in hourly_entries:
                 entry.interval = Interval.HOURLY
 
             # Sets the first entry for each coin for each day as 'daily'
-            daily_entries: List[CoinValue] = (
-                session.query(CoinValue).group_by(CoinValue.coin_id, func.date(CoinValue.datetime)).all()
-            )
+            daily_entries: List[CoinValue] = session.execute(daily_query).scalars()
             for entry in daily_entries:
                 entry.interval = Interval.DAILY
 
             # Sets the first entry for each coin for each month as 'weekly'
             # (Sunday is the start of the week)
-            weekly_entries: List[CoinValue] = (
-                session.query(CoinValue).group_by(CoinValue.coin_id, func.strftime("%Y-%W", CoinValue.datetime)).all()
-            )
+            weekly_entries: List[CoinValue] = session.execute(weekly_query).scalars()
             for entry in weekly_entries:
                 entry.interval = Interval.WEEKLY
 
