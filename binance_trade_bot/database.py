@@ -212,13 +212,13 @@ class Database:
                 sqlite=func.strftime(sqlite, CoinValue.datetime),
             )
 
-            return select(CoinValue, func.min(CoinValue.datetime), dt_column).group_by(
+            return select(CoinValue, func.max(CoinValue.datetime), dt_column).group_by(
                 CoinValue.coin_id, CoinValue, dt_column
             )
 
         hourly_query = _datetime_query(default="HH24", sqlite="%H")
-        weekly_query = _datetime_query(default="WW", sqlite="%W")
-        daily_query = _datetime_query(default="DDD", sqlite="%j")
+        weekly_query = _datetime_query(default="YYYY-WW", sqlite="%Y-%W")
+        daily_query = _datetime_query(default="YYYY-DDD", sqlite="%Y-%j")
 
         session: Session
         with self.db_session() as session:
