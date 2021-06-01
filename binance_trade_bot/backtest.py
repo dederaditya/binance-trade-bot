@@ -13,8 +13,6 @@ from .logger import Logger
 from .models import Coin, Pair
 from .strategies import get_strategy
 
-cache = SqliteDict("data/backtest_cache.db")
-
 
 class MockBinanceManager(BinanceAPIManager):
     def __init__(
@@ -29,6 +27,7 @@ class MockBinanceManager(BinanceAPIManager):
         self.config = config
         self.datetime = start_date or datetime(2021, 1, 1)
         self.balances = start_balances or {config.BRIDGE.symbol: 100}
+        self.cache = SqliteDict("data/backtest_cache.db")
 
     def setup_websockets(self):
         pass  # No websockets are needed for backtesting
@@ -43,23 +42,52 @@ class MockBinanceManager(BinanceAPIManager):
         """
         Get ticker price of a specific coin
         """
-        target_date = self.datetime.strftime("%d %b %Y %H:%M:%S")
+        target_date = self.datetime.replace(second=0, microsecond=0)
+        target_date_str = self.datetime.isoformat(timespec="seconds")
+
         key = f"{ticker_symbol} - {target_date}"
-        val = cache.get(key, None)
+        val = self.cache.get(key, None)
+
         if val is None:
             end_date = self.datetime + timedelta(minutes=1000)
             if end_date > datetime.now():
                 end_date = datetime.now()
-            end_date = end_date.strftime("%d %b %Y %H:%M:%S")
-            self.logger.info(f"Fetching prices for {ticker_symbol} between {self.datetime} and {end_date}")
-            for result in self.binance_client.get_historical_klines(
-                ticker_symbol, "1m", target_date, end_date, limit=1000
-            ):
-                date = datetime.utcfromtimestamp(result[0] / 1000).strftime("%d %b %Y %H:%M:%S")
+            end_date_str = end_date.isoformat(timespec="seconds")
+
+            self.logger.info(
+                f"Fetching prices for {ticker_symbol} between {target_date} and {end_date}"
+            )
+
+            # Use internal binance_client method because the public one doesn't
+            # actually pass on limits.
+            results = self.binance_client._historical_klines(
+                ticker_symbol,
+                "1m",
+                start_str=target_date_str,
+                end_str=end_date_str,
+                limit=1000
+            )
+
+            prices = {}
+            for result in results:
+                result_date = datetime.utcfromtimestamp(result[0] / 1000)
+                result_date = result_date.replace(second=0, microsecond=0)
+
                 price = float(result[1])
-                cache[f"{ticker_symbol} - {date}"] = price
-            cache.commit()
-            val = cache.get(key, None)
+                prices[f"{ticker_symbol} - {result_date}"] = price
+
+            # Verify all intervals were returning, explicitly mark as missing
+            # otherwise so we can skip fetch.
+            for verify_date in (target_date + timedelta(minutes=n) for n in range(1000)):
+                verify_key = f"{ticker_symbol} - {verify_date}"
+                self.cache[verify_key] = prices.get(verify_key, "MISSING")
+
+            self.cache.commit()
+            val = self.cache.get(key, None)
+
+        if val == "MISSING":
+            return None
+
         return val
 
     def get_currency_balance(self, currency_symbol: str, force=False):
@@ -127,10 +155,13 @@ class MockBinanceManager(BinanceAPIManager):
                 total += price * balance
         return total
 
+    def close(self):
+        self.cache.close()
+
 
 class MockDatabase(Database):
     def __init__(self, logger: Logger, config: Config):
-        super().__init__(logger, config, "sqlite:///")
+        super().__init__(logger, config)
 
     def log_scout(self, pair: Pair, target_ratio: float, current_coin_price: float, other_coin_price: float):
         pass
@@ -144,10 +175,12 @@ def backtest(
     start_balances: Dict[str, float] = None,
     starting_coin: str = None,
     config: Config = None,
+    logger: Logger = None,
 ):
     """
 
     :param config: Configuration object to use
+    :param logger: Logger object to use
     :param start_date: Date to  backtest from
     :param end_date: Date to backtest up to
     :param interval: Number of virtual minutes between each scout
@@ -158,7 +191,7 @@ def backtest(
     :return: The final coin balances
     """
     config = config or Config()
-    logger = Logger("backtesting", enable_notifications=False)
+    logger = logger or Logger(config, "backtesting", enable_notifications=False)
 
     end_date = end_date or datetime.today()
 
@@ -194,5 +227,5 @@ def backtest(
             n += 1
     except KeyboardInterrupt:
         pass
-    cache.close()
+    manager.close()
     return manager
