@@ -51,7 +51,7 @@ class AutoTrader:
                 # maybe we have a lot of usdt already?
                 bridgeBalance = self.manager.get_currency_balance(self.config.BRIDGE.symbol)
                 self.logger.debug(f"bridge {self.config.BRIDGE} balance {bridgeBalance}")
-                if bridgeBalance < 50:
+                if bridgeBalance < 10:
                     return None
                 self.logger.info(f"Looks like there is bridge currency, will continue with buy")
 

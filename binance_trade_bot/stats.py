@@ -54,6 +54,9 @@ def _get_progress_table(db: Database) -> str:
             for t in progress
         ]
 
+    if len(rows) == 0:
+        return "No trades."
+
     header = " | ".join(
         [
             f"{'Coin':<6}",
