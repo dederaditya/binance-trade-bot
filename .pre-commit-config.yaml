@@ -75,6 +75,5 @@ repos:
     - schedule==1.1.0
     - sqlalchemy==1.3.23
     - sqlitedict==1.7.0
-    - twisted==21.2.0
     - unicorn-binance-websocket-api==1.30.0
     - unicorn-fy==0.11.0
