@@ -8,7 +8,7 @@ from typing import List, Optional, Union
 from socketio import Client
 from socketio.exceptions import ConnectionError as SocketIOConnectionError
 
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, update
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy.sql.expression import ColumnClause
@@ -19,6 +19,8 @@ from .models import *  # pylint: disable=wildcard-import
 
 
 class IfDialect(ColumnClause):
+    name = "if_dialect"
+
     def __init__(self, default, **dialect_elements):
         self.default_element = default
         self.dialect_elements = dialect_elements
@@ -206,37 +208,52 @@ class Database:
             session.query(ScoutHistory).filter(ScoutHistory.datetime < time_diff).delete()
 
     def prune_value_history(self):
-        def _datetime_query(default, sqlite):
+        def _datetime_id_query(default, sqlite):
             dt_column = if_dialect(
                 default=func.to_char(CoinValue.datetime, default),
                 sqlite=func.strftime(sqlite, CoinValue.datetime),
             )
 
-            return select(CoinValue, func.max(CoinValue.datetime), dt_column).group_by(
-                CoinValue.coin_id, CoinValue, dt_column
+            grouped = select(
+                CoinValue, func.max(CoinValue.datetime), dt_column
+            ).group_by(CoinValue.coin_id, CoinValue, dt_column)
+
+            return select(grouped.c.id.label("id")).select_from(grouped)
+
+        def _update_query(datetime_query, interval):
+            return (
+                update(CoinValue)
+                .where(CoinValue.id.in_(datetime_query))
+                .values(interval=interval)
+                .execution_options(synchronize_session="fetch")
             )
 
-        hourly_query = _datetime_query(default="HH24", sqlite="%H")
-        weekly_query = _datetime_query(default="YYYY-WW", sqlite="%Y-%W")
-        daily_query = _datetime_query(default="YYYY-DDD", sqlite="%Y-%j")
+        hourly_update_query = _update_query(
+            _datetime_id_query(default="HH24", sqlite="%H"), Interval.HOURLY
+        )
+        weekly_update_query = _update_query(
+            _datetime_id_query(default="YYYY-WW", sqlite="%Y-%W"),
+            Interval.WEEKLY,
+        )
+        daily_update_query = _update_query(
+            _datetime_id_query(default="YYYY-DDD", sqlite="%Y-%j"),
+            Interval.DAILY,
+        )
 
         session: Session
         with self.db_session() as session:
             # Sets the first entry for each coin for each hour as 'hourly'
-            hourly_entries: List[CoinValue] = session.execute(hourly_query).scalars()
-            for entry in hourly_entries:
-                entry.interval = Interval.HOURLY
+            session.execute(hourly_update_query)
 
             # Sets the first entry for each coin for each day as 'daily'
-            daily_entries: List[CoinValue] = session.execute(daily_query).scalars()
-            for entry in daily_entries:
-                entry.interval = Interval.DAILY
+            session.execute(daily_update_query)
 
             # Sets the first entry for each coin for each month as 'weekly'
             # (Sunday is the start of the week)
-            weekly_entries: List[CoinValue] = session.execute(weekly_query).scalars()
-            for entry in weekly_entries:
-                entry.interval = Interval.WEEKLY
+            session.execute(weekly_update_query)
+
+            # Early commit to make sure the delete statements work properly.
+            session.commit()
 
             # The last 24 hours worth of minutely entries will be kept, so
             # count(coins) * 1440 entries
@@ -274,37 +291,6 @@ class Database:
             {"table": model.__tablename__, "data": model.info()},
             namespace="/backend",
         )
-
-    def migrate_old_state(self):
-        """
-        For migrating from old dotfile format to SQL db. This method should be removed in
-        the future.
-        """
-        if os.path.isfile(".current_coin"):
-            with open(".current_coin") as f:
-                coin = f.read().strip()
-                self.logger.info(f".current_coin file found, loading current coin {coin}")
-                self.set_current_coin(coin)
-            os.rename(".current_coin", ".current_coin.old")
-            self.logger.info(f".current_coin renamed to .current_coin.old - You can now delete this file")
-
-        if os.path.isfile(".current_coin_table"):
-            with open(".current_coin_table") as f:
-                self.logger.info(f".current_coin_table file found, loading into database")
-                table: dict = json.load(f)
-                session: Session
-                with self.db_session() as session:
-                    for from_coin, to_coin_dict in table.items():
-                        for to_coin, ratio in to_coin_dict.items():
-                            if from_coin == to_coin:
-                                continue
-                            pair = session.merge(self.get_pair(from_coin, to_coin))
-                            pair.ratio = ratio
-                            session.add(pair)
-
-            os.rename(".current_coin_table", ".current_coin_table.old")
-            self.logger.info(".current_coin_table renamed to .current_coin_table.old - " "You can now delete this file")
-
 
 class TradeLog:
     def __init__(self, db: Database, from_coin: Coin, to_coin: Coin, selling: bool):
