@@ -296,7 +296,8 @@ class BinanceAPIManager:
         if order is None:
             return None
 
-        self.logger.info(f"Bought {origin_symbol}")
+        newBalance = self.get_currency_balance(origin_symbol)
+        self.logger.info(f"Bought {newBalance} {origin_symbol}")
 
         trade_log.set_complete(order.cumulative_quote_qty)
 
